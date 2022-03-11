@@ -134,7 +134,7 @@ def unique_xfg_sym(xfg_path_list):
 
     for xfg_path in tqdm(xfg_path_list, total=len(xfg_path_list), desc="xfgs: "):
         xfg = nx.read_gpickle(xfg_path)
-        label = xfg.graph["label"]
+        #label = xfg.graph["label"]
         file_path = xfg.graph["file_paths"][0]
         assert exists(file_path), f"{file_path} not exists!"
         for ln in xfg:
@@ -146,15 +146,11 @@ def unique_xfg_sym(xfg_path_list):
         xfg_md5 = getMD5(str(sorted(edges_md5)))
         if xfg_md5 not in md5_dict:
             md5_dict[xfg_md5] = dict()
-            md5_dict[xfg_md5]["label"] = label
+            #md5_dict[xfg_md5]["label"] = label
             md5_dict[xfg_md5]["xfg"] = xfg_path
+            mul_ct += 1
         else:
-            md5_label = md5_dict[xfg_md5]["label"]
-            if md5_label != -1 and md5_label != label:
-                conflict_ct += 1
-                md5_dict[xfg_md5]["label"] = -1
-            else:
-                mul_ct += 1
+            conflict_ct += 1
     print(f"total conflit: {conflict_ct}")
     print(f"total multiple: {mul_ct}")
     return md5_dict
@@ -170,13 +166,11 @@ def split_list(files: List[str], out_root_path: str):
     Returns:
 
     """
-    X_train, X_test = train_test_split(files, test_size=0.2)
-    X_test, X_val = train_test_split(X_test, test_size=0.5)
+    X_val= files
+    print("len files:{}".format(len(files)))
     if not exists(f"{out_root_path}"):
         os.makedirs(f"{out_root_path}")
-    with open(f"{out_root_path}/train.json", "w") as f:
-        json.dump(X_train, f)
     with open(f"{out_root_path}/test.json", "w") as f:
-        json.dump(X_test, f)
-    with open(f"{out_root_path}/val.json", "w") as f:
+        print("=======================================")
+        print(out_root_path)
         json.dump(X_val, f)

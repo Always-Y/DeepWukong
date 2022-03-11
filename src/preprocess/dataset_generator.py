@@ -36,7 +36,8 @@ def unique_data(cweid: str, root: str):
     Returns:
 
     """
-    XFG_root_path = join(root, cweid, "XFG")
+    #XFG_root_path 需要修改
+    XFG_root_path = join(root, cweid, "XFG/data/CWElibhv/source-code/libhv/base")
     testcaseids = os.listdir(XFG_root_path)
     xfg_paths = list()
     for testcase in testcaseids:
@@ -52,8 +53,8 @@ def unique_data(cweid: str, root: str):
     xfg_unique_paths = list()
     for md5 in xfg_dict:
         # remove conflicts
-        if xfg_dict[md5]["label"] != -1:
-            xfg_unique_paths.append(xfg_dict[md5]["xfg"])
+        xfg_unique_paths.append(xfg_dict[md5]["xfg"])  
+    
     return xfg_unique_paths
 
 
@@ -142,7 +143,7 @@ def add_symlines(cweid: str, root: str, split_token: bool):
 
     """
 
-    XFG_root_path = join(root, cweid, "XFG")
+    XFG_root_path = join(root, cweid, "XFG/data/CWElibhv/source-code/libhv/base")
     testcaseids = os.listdir(XFG_root_path)
     testcase_len = len(testcaseids)
 
@@ -174,4 +175,5 @@ if __name__ == '__main__':
     seed_everything(config.seed, workers=True)
     add_symlines(config.dataset.name, config.data_folder, config.split_token)
     xfg_unique_paths = unique_data(config.dataset.name, config.data_folder)
+    print("====================**************************")
     split_list(xfg_unique_paths, join(config.data_folder, config.dataset.name))

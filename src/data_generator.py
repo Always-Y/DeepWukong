@@ -68,7 +68,7 @@ def extract_nodes_with_location_info(nodes):
     another array identifying the node_id of those nodes
     another array indicating the line numbers
     all 3 return arrays should have same length indicating 1-to-1 matching.
-    
+
     """
 
     node_indices = []
@@ -95,7 +95,7 @@ def build_PDG(code_path: str, sensi_api_path: str,
     """
     build program dependence graph from code
 
-    Args:
+    Args: 
         code_path (str): source code root path
         sensi_api_path (str): path to sensitive apis
         source_path (str): source file path
@@ -168,8 +168,8 @@ def build_PDG(code_path: str, sensi_api_path: str,
     }
 
 
-def build_XFG(PDG: nx.DiGraph, key_line_map: Dict[str, Set[int]],
-              vul_lines: Set[int] = None) -> Dict[str, List[nx.DiGraph]]:
+def build_XFG(PDG: nx.DiGraph, key_line_map: Dict[str, Set[int]]
+                ) -> Dict[str, List[nx.DiGraph]]:
     """
     build XFGs
     Args:
@@ -187,6 +187,7 @@ def build_XFG(PDG: nx.DiGraph, key_line_map: Dict[str, Set[int]],
 
             # backward traversal
             bqueue = list()
+
             visited = set()
             bqueue.append(ln)
             visited.add(ln)
@@ -215,15 +216,7 @@ def build_XFG(PDG: nx.DiGraph, key_line_map: Dict[str, Set[int]],
             if len(sliced_lines) != 0:
                 XFG = PDG.subgraph(list(sliced_lines)).copy()
                 XFG.graph["key_line"] = ln
-                if vul_lines is not None:
-                    if len(sliced_lines.intersection(vul_lines)) != 0:
-                        XFG.graph["label"] = 1
-                        # ct1 += 1
-                    else:
-                        XFG.graph["label"] = 0
-                        # ct0 += 1
-                else:
-                    XFG.graph["label"] = "UNK"
+
                 res[key].append(XFG)
         # print("ct1:", ct1)
         # print("ct0:", ct0)
@@ -248,7 +241,7 @@ def getCodeIDtoPathDict(testcases: List,
 
         for file in files:
             path = file.attrib["path"]
-            flaws = file.findall("flaw")
+            flaws = file.findall("flaw")  # 三种不同的标签
             mixeds = file.findall("mixed")
             fix = file.findall("fix")
             # print(mixeds)
@@ -331,7 +324,7 @@ def handle_queue_message(queue: Queue):
     return xfg_ct
 
 
-def process_parallel(testcase: ET.Element, queue: Queue, doneIDs: Set, codeIDtoPath: Dict, cwe_root: str,
+def process_parallel(file_map: List, cwe_root: str,
                      source_root_path: str,
                      out_root_path: str):
     """
@@ -347,23 +340,24 @@ def process_parallel(testcase: ET.Element, queue: Queue, doneIDs: Set, codeIDtoP
     Returns:
 
     """
-    testcaseid = testcase.attrib["id"]
-    if testcaseid in doneIDs:
-        return testcaseid
-    if testcaseid in codeIDtoPath:
-        file_map = codeIDtoPath[testcaseid]
-        for file_path in file_map:
-            # print(file_path)
-            vul_lines = file_map[file_path]
-            csv_path = join(cwe_root, "csv", os.path.abspath(source_root_path)[1:],
-                            file_path)
-            source_path = join(source_root_path, file_path)
-            PDG, key_line_map = build_PDG(csv_path, "data/sensiAPI.txt",
+
+    # 需要构建一个 路径的集合 file_map
+    for file_path in file_map:
+        # print(file_path)
+        # vul_lines = file_map[file_path]  # 测试集不存在 vul_lines
+        # 关键在于获取csv路径。很难调
+        csv_path = join(cwe_root, "csv/parsed", os.path.abspath(file_path)[1:],
+                            )
+        
+        print("csv_path :{}".format(csv_path))
+        source_path = file_path
+        print("source_path:{}".format(source_path))
+        PDG, key_line_map = build_PDG(csv_path, "data/sensiAPI.txt",
                                           source_path)
-            res = build_XFG(PDG, key_line_map, vul_lines)
-            queue.put(QueueMessage(res, out_root_path, testcaseid))
-            # dump_XFG(res, out_root_path, testcaseid)
-    return testcaseid
+        res = build_XFG(PDG, key_line_map)  # vul_lines 不存在 所以要考虑取消参数
+        # queue.put(QueueMessage(res, out_root_path, testcaseid))
+        dump_XFG(res, out_root_path, file_path)
+    return file_map
 
 
 def generate(config_path: str):
@@ -373,46 +367,33 @@ def generate(config_path: str):
     cwe_root = join(root, cweid)
     source_root_path = join(cwe_root, "source-code")
     out_root_path = join(cwe_root, "XFG")
-    xml_path = join(source_root_path, "manifest.xml")
+    # xml_path = join(source_root_path, "manifest.xml")
 
-    tree = ET.ElementTree(file=xml_path)
-    testcases = tree.findall("testcase")
-    codeIDtoPath = getCodeIDtoPathDict(testcases, source_root_path)
+    # tree = ET.ElementTree(file=xml_path)
+    # testcases = tree.findall("testcase")
+    # codeIDtoPath = getCodeIDtoPathDict(testcases, source_root_path)
 
-    if not exists(out_root_path):
-        os.makedirs(out_root_path)
-    if not exists(join(cwe_root, "doneID.txt")):
-        os.system("touch {}".format(join(cwe_root, "doneID.txt")))
-    with open(join(cwe_root, "doneID.txt"), "r", encoding="utf-8") as f:
-        doneIDs = set(f.read().split(","))
-
-    testcase_len = len(testcases)
-    with Manager() as m:
-        message_queue = m.Queue()  # type: ignore
-        pool = Pool(USE_CPU)
-        xfg_ct = pool.apply_async(handle_queue_message, (message_queue,))
-        process_func = functools.partial(process_parallel, queue=message_queue, doneIDs=doneIDs,
-                                         codeIDtoPath=codeIDtoPath,
-                                         cwe_root=cwe_root, source_root_path=source_root_path,
-                                         out_root_path=out_root_path)
-        testcaseids_done: List = [
-            testcaseid
-            for testcaseid in tqdm(
-                pool.imap_unordered(process_func, testcases),
-                desc=f"testcases: ",
-                total=testcase_len,
-            )
-        ]
-
-        message_queue.put(QueueMessage(None, None, None, True))
-        pool.close()
-        pool.join()
-    print(f"total {xfg_ct.get()} XFGs!")
-    for testcaseid in testcaseids_done:
-        with open(join(cwe_root, "doneID.txt"), 'a',
-                  encoding="utf-8") as f:
-            f.write(str(testcaseid))
-            f.write(",")
+    # 判断有无 doneID.txt 文件，没有就创建一个
+    cnt = 0
+    file_map = []
+    for root, dirs, files in os.walk(source_root_path):
+        for file in files:
+            if file.endswith(".c") or file.endswith(".cpp") or file.endswith(".h"):
+                # print(os.path.join(root,file))
+                file_path = os.path.join(root, file)
+                file_map.append(file_path)
+                cnt += 1
+                
+    print("total file num :{}".format(cnt))
+    #file_map 存储所有的file_path 得到每一个C++ 相关文件的目录
+    #解析函数
+    #cwe_root :data/CWElibhv
+    # source_root_path : data/CWElibhv/source-code
+    #out_root_path : data/CWElibhv/XFG
+    process_parallel(file_map, cwe_root, source_root_path, out_root_path)
+    print("all Finish")
+   
+    
 
 
 if __name__ == "__main__":

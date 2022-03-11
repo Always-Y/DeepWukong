@@ -47,7 +47,7 @@ def train_word_embedding(config_path: str):
     config = cast(DictConfig, OmegaConf.load(config_path))
     cweid = config.dataset.name
     root = config.data_folder
-    train_json = f"{root}/{cweid}/train.json"
+    train_json = f"{root}/{cweid}/test.json"
     with open(train_json, "r") as f:
         paths = json.load(f)
     tokens_list = list()

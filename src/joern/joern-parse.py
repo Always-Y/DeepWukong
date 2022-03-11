@@ -21,6 +21,9 @@ if __name__ == "__main__":
     config = cast(DictConfig, OmegaConf.load(__args.config))
     joern = config.joern_path
     root = join(config.data_folder, config.dataset.name)
+    print("root path :{}".format(root))
     source_path = join(root, "source-code")
+    print("source path :{}".format(source_path))
     out_path = join(root, "csv")
+    print("out path :{}".format(out_path))
     system(f"{joern} {out_path} {source_path}")
